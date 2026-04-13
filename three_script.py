@@ -3,6 +3,7 @@ from scipy import stats
 import pandas as pd
 import sqlite3 as sql
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 import dtale as dt
 from pathlib import Path
 import os
@@ -87,13 +88,19 @@ query = """
 """
 # creating the pandas object from the query
 df_game = pd.read_sql(query, connection).astype({"season": int})
-
-d = dt.show(df_game, host='localhost')
-#d.open_browser()
                  
 # Pulizia, Filtriamo i dati post-1980
 # Visto che prima del 1980 il tiro da 3 non esisteva
 df_game_clear = df_game[df_game['season'] > 1984].copy()
+
+d = dt.show(df_game_clear, host='localhost')
+#d.open_browser()
+
+#Recuperiamo il valore minimo e massimo della season
+start_year = int(df_game_clear['season'].min()) # 1985
+end_year = int(df_game_clear['season'].max()) # 2022
+
+#--------- Prima figura ----------
 
 # ------------------------------
 # Plot win_rate - three_pt_rate: Tirare tante triple garantisce più vittorie?
@@ -101,11 +108,12 @@ df_game_clear = df_game[df_game['season'] > 1984].copy()
 
 X_volume = df_game_clear['three_pt_rate'].values
 Y_win = df_game_clear['win_rate'].values
+Y_season = df_game_clear['season'].values
 
-fig1, (ax1) = plt.subplots(1, 1, figsize=(width, height))
-plt.subplots_adjust(wspace=0.5)
+fig1, (ax1, bx1) = plt.subplots(2, 1, figsize=(width, height + 2))
+plt.subplots_adjust(hspace=0.4)
 
-# Plottiamo i punti individuali
+#---- scatter win-tiri da tre
 scatter = ax1.scatter(
   X_volume,
   Y_win,
@@ -131,6 +139,32 @@ ax1.set_ylabel('Win')
 ax1.grid(True, linestyle=':', alpha=0.5)
 ax1.legend(loc='upper left')
 
+#---- scatter season-tiri da tre
+scatterb1 = bx1.scatter(
+  X_volume,
+  Y_season,
+  c=df_game_clear['season'],
+  cmap='viridis',
+  alpha=0.7,
+  edgecolor='none'
+)
+
+# Calcolo della regressione lineare
+slope1b, intercept1b, r_value1b, p_value1b, std_err1b = stats.linregress(X_volume, Y_season)
+
+line1b = slope1b * X_volume + intercept1b
+bx1.plot(X_volume, line1b,
+         color='red', 
+         label=f'r_pearson = {r_value1b:.2f}'
+)
+print("three_pt_rate - stagione: ",r_value1b, p_value1b)
+
+bx1.set_yticks(np.arange(1985, 2025, 10)) # Imposta i segni ogni 5 anni dal 1985 al 2023
+bx1.set_xlabel('Tiri da 3')
+bx1.set_ylabel('Stagione')
+bx1.grid(True, linestyle=':', alpha=0.5)
+bx1.legend(loc='upper left')
+
 # Aggiungiamo una Colorbar unica per spiegare il colore dei punti (la season)
 cbar1 = fig1.colorbar(scatter, ax=[ax1], orientation='vertical', pad=0.04)
 cbar1.set_label('Stagione', rotation=270, labelpad=15)
@@ -138,7 +172,7 @@ cbar1.set_label('Stagione', rotation=270, labelpad=15)
 # salvo il plot in PDF
 # plt.tight_layout()  # Evita che i titoli o le etichette vengano tagliati
 cartella_salvataggio = Path(r"C:\Users\calci\OneDrive\Desktop\Lab\Computazionale\DC1\latex\plot")
-percorso_finale = cartella_salvataggio / f'win_three.pdf'
+percorso_finale = cartella_salvataggio / f'win_three_season.pdf'
 plt.savefig(percorso_finale, format='pdf', bbox_inches='tight')
 print(f"Salvato con successo in: {percorso_finale}")
 
@@ -151,13 +185,14 @@ print(f"Salvato con successo in: {percorso_finale}")
 # --------------------
 
 #aggiungere ax4 se serve
-fig2, (ax3) = plt.subplots(1, 1, figsize=(width, height))
+fig2, (ax3, bx3) = plt.subplots(2, 1, figsize=(width, height + 2))
 # Distanzia i grafici orizzontalmente per evitare sovrapposizioni
-plt.subplots_adjust(wspace=0.5)
+plt.subplots_adjust(hspace=0.5)
 
 # X: Efficienza, Y: Vittorie
 X_eff = df_game_clear['efg_pct'].values
 
+#---- scatter efg - win
 scatter3 = ax3.scatter(
   X_eff, 
   Y_win, 
@@ -184,6 +219,34 @@ ax3.set_ylabel('Win')
 ax3.grid(True, linestyle=':', alpha=0.5)
 ax3.legend(loc='upper left')
 
+#---- scatter efg - season
+scatterb3 = bx3.scatter(
+  X_eff, 
+  Y_season, 
+  c=df_game_clear['season'], 
+  cmap='viridis',
+  alpha=0.7, 
+  edgecolor='none'
+)
+
+# Calcolo della regressione lineare
+# slope (m) è la pendenza, intercept (q) è l'intercetta, r_value3 è coeff di pearson
+slopeb3, interceptb3, r_valueb3, p_valueb3, std_errb3 = stats.linregress(X_eff, Y_season)
+
+# Calcoliamo i valori di Y basandoci sulla retta di regressione
+lineb3 = slopeb3 * X_eff + interceptb3
+bx3.plot(X_eff, lineb3, 
+         color='red', 
+         label=f'r_pearson = {r_valueb3:.2f}'
+)
+print("efg_rate - stagione: ",r_valueb3, p_valueb3)
+
+bx3.set_yticks(np.arange(1985, 2025, 10))
+bx3.set_xlabel('eFG%')
+bx3.set_ylabel('Stagione')
+bx3.grid(True, linestyle=':', alpha=0.5)
+bx3.legend(loc='upper left')
+
 # Aggiungiamo una Colorbar unica per spiegare il colore dei punti (la season)
 cbar2 = fig2.colorbar(scatter3, ax=[ax3], orientation='vertical', pad=0.04)
 cbar2.set_label('Stagione', rotation=270, labelpad=15)
@@ -191,7 +254,7 @@ cbar2.set_label('Stagione', rotation=270, labelpad=15)
 # salvo il plot in PDF
 # plt.tight_layout()  # Evita che i titoli o le etichette vengano tagliati
 cartella_salvataggio = Path(r"C:\Users\calci\OneDrive\Desktop\Lab\Computazionale\DC1\latex\plot")
-percorso_finale = cartella_salvataggio / f'win_efg.pdf'
+percorso_finale = cartella_salvataggio / f'win_efg_season.pdf'
 plt.savefig(percorso_finale, format='pdf', bbox_inches='tight')
 print(f"Salvato con successo in: {percorso_finale}")
 
@@ -223,6 +286,8 @@ ax4.plot(X_orb, line4,
          label=f'r_pearson = {r_value4:.2f}'
 )
 print("win_rate - orb_pct: ",r_value4, p_value4)
+r_value4b, p_value4b = stats.pearsonr(X_orb, Y_season)
+print("orb_ptc - stagione: ",r_value4b, p_value4b)
 
 ax4.set_xlabel("ORB%")
 ax4.set_ylabel("Win")
@@ -246,6 +311,8 @@ ax5.plot(X_tov, line5,
          label=f'r_pearson = {r_value5:.2f}'
 )
 print("win_rate - tov_pct: ",r_value5, p_value5)
+r_value5b, p_value5b = stats.pearsonr(X_tov, Y_season)
+print("tov_ptc - stagione: ",r_value5b, p_value5b)
 
 ax5.set_xlabel("TOV%")
 ax5.set_ylabel("Win")
